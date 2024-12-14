@@ -26,5 +26,6 @@ go.work.sum
 
 # test config
 *.test.conf
+*.test.json
 
 out/

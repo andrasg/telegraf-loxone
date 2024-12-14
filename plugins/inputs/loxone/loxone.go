@@ -1,6 +1,9 @@
 package loxone
 
 import (
+	"encoding/json"
+	"fmt"
+	"io"
 	"os"
 	"sync"
 	"time"
@@ -13,10 +16,11 @@ import (
 
 // LoxoneInput is the main struct for the plugin
 type LoxoneInput struct {
-	Url  string       `toml:"url"`
-	User string       `toml:"user"`
-	Key  string       `toml:"key"`
-	Item []LoxoneItem `toml:"item"`
+	Url        string       `toml:"url"`
+	User       string       `toml:"user"`
+	Key        string       `toml:"key"`
+	Item       []LoxoneItem `toml:"item"`
+	JsonConfig string       `toml:"jsonconfig"`
 
 	conn     loxone.Loxone
 	messages []LoxoneEvent
@@ -38,6 +42,41 @@ type LoxoneItem struct {
 	UUID        string            `toml:"uuid"`
 	Tags        map[string]string `toml:"tags"`
 	Measurement string            `toml:"measurement"`
+}
+
+type PointMapping struct {
+	Bucket       string        `json:"bucket"`
+	Measurements []Measurement `json:"measurements"`
+}
+
+type Measurement struct {
+	Name       string      `json:"name"`
+	Datapoints []Datapoint `json:"datapoints"`
+}
+
+type Datapoint struct {
+	Fields     map[string]string `json:"fields"`
+	Tags       map[string]string `json:"tags"`
+	IsCritical bool              `json:"isCritical,omitempty"`
+}
+
+func ReadPointMappings(filename string) ([]PointMapping, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, fmt.Errorf("error opening file: %v", err)
+	}
+	defer file.Close()
+
+	byteValue, _ := io.ReadAll(file)
+
+	var data struct {
+		PointMappings []PointMapping `json:"pointMappings"`
+	}
+	if err := json.Unmarshal(byteValue, &data); err != nil {
+		return nil, fmt.Errorf("error unmarshaling JSON: %v", err)
+	}
+
+	return data.PointMappings, nil
 }
 
 func (w *LoxoneInput) Description() string {
@@ -83,23 +122,84 @@ func (w *LoxoneInput) findItemByUUID(uuid string) (LoxoneItem, bool) {
 
 func (w *LoxoneInput) Start(acc telegraf.Accumulator) error {
 	loglevel := os.Getenv("LOGLEVEL")
-	if loglevel == "DEBUG" {
+
+	switch loglevel {
+	case "TRACE":
+		log.SetLevel(log.TraceLevel)
+	case "DEBUG":
 		log.SetLevel(log.DebugLevel)
-	} else if loglevel == "INFO" {
+	case "INFO":
 		log.SetLevel(log.InfoLevel)
-	} else {
+	case "WARN":
+		log.SetLevel(log.WarnLevel)
+	case "ERROR":
+		log.SetLevel(log.ErrorLevel)
+	case "FATAL":
+		log.SetLevel(log.FatalLevel)
+	default:
 		log.SetLevel(log.WarnLevel)
 	}
+
 	var err error
 	w.conn, err = loxone.New(
 		loxone.WithHost(w.Url),
 		loxone.WithUsernameAndPassword(w.User, w.Key),
 		loxone.WithAutoReconnect(true),
 		loxone.WithRegisterEvents(),
+		loxone.WithKeepAliveInterval(30*time.Second),
 	)
 
 	if err != nil {
 		return err
+	}
+
+	if w.JsonConfig != "" {
+		mappings, _ := ReadPointMappings(w.JsonConfig)
+		log.Debugf("Read json mappings: %v", len(mappings))
+
+		items := []LoxoneItem{}
+
+		for _, mapping := range mappings {
+
+			log.Debugf("Mapping: %v", mapping.Bucket)
+			log.Debugf("  Number of measurements: %v", len(mapping.Measurements))
+
+			for _, measurement := range mapping.Measurements {
+				log.Debugf("  Measurement: %v", measurement.Name)
+				log.Debugf("    Number of datapoints: %v", len(measurement.Datapoints))
+
+				for i, datapoint := range measurement.Datapoints {
+					log.Debugf("    Datapoint: %v", i)
+					log.Debugf("      Number of tags: %v", len(datapoint.Tags))
+
+					tags := map[string]string{}
+
+					for tag, tagvalue := range datapoint.Tags {
+						log.Debugf("        Tag: %v=%v", tag, tagvalue)
+						tags[tag] = datapoint.Tags[tag]
+					}
+
+					log.Debugf("      Number of fields: %v", len(datapoint.Fields))
+					for field, uuid := range datapoint.Fields {
+						log.Debugf("        Field: %v", field)
+						log.Debugf("        UUID: %v", uuid)
+
+						item := LoxoneItem{
+							Bucket:      mapping.Bucket,
+							Measurement: measurement.Name,
+							Field:       field,
+							UUID:        uuid,
+							Tags:        tags,
+						}
+
+						items = append(items, item)
+					}
+				}
+			}
+		}
+
+		// append config
+		w.Item = append(w.Item, items...)
 	}
 
 	go func() {
@@ -124,7 +224,9 @@ func (w *LoxoneInput) Start(acc telegraf.Accumulator) error {
 				loxEvent.mappedconfig.Field,
 				loxEvent.value)
 
+			w.mu.Lock()
 			w.messages = append(w.messages, loxEvent)
+			w.mu.Unlock()
 		}
 	}()
 	return nil
@@ -140,10 +242,14 @@ func (w *LoxoneInput) Gather(acc telegraf.Accumulator) error {
 		fields := make(map[string]interface{})
 		fields[msg.mappedconfig.Field] = msg.value
 
-		// Create a map for tags and include bucket in the destinationdb
-		tags := map[string]string{
-			"destinationdb": msg.mappedconfig.Bucket,
+		// Create a map for tags
+		tags := map[string]string{}
+
+		// include the bucket as tag if set
+		if msg.mappedconfig.Bucket != "" {
+			tags["bucket"] = msg.mappedconfig.Bucket
 		}
+
 		// Add tags from the config
 		for tagname := range msg.mappedconfig.Tags {
 			tags[tagname] = msg.mappedconfig.Tags[tagname]
