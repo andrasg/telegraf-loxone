@@ -1,13 +1,14 @@
 package loxone
 
 import (
-	"log"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/XciD/loxone-ws"
 	"github.com/influxdata/telegraf"
 	"github.com/influxdata/telegraf/plugins/inputs"
+	log "github.com/sirupsen/logrus"
 )
 
 // LoxoneInput is the main struct for the plugin
@@ -81,6 +82,14 @@ func (w *LoxoneInput) findItemByUUID(uuid string) (LoxoneItem, bool) {
 }
 
 func (w *LoxoneInput) Start(acc telegraf.Accumulator) error {
+	loglevel := os.Getenv("LOGLEVEL")
+	if loglevel == "DEBUG" {
+		log.SetLevel(log.DebugLevel)
+	} else if loglevel == "INFO" {
+		log.SetLevel(log.InfoLevel)
+	} else {
+		log.SetLevel(log.WarnLevel)
+	}
 	var err error
 	w.conn, err = loxone.New(
 		loxone.WithHost(w.Url),
@@ -109,7 +118,7 @@ func (w *LoxoneInput) Start(acc telegraf.Accumulator) error {
 				mappedconfig: item,
 			}
 
-			log.Printf("Received event: %v, %v, %v=%v",
+			log.Infof("Received event: %v, %v, %v=%v",
 				loxEvent.mappedconfig.Bucket,
 				loxEvent.mappedconfig.Measurement,
 				loxEvent.mappedconfig.Field,

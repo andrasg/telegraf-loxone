@@ -5,6 +5,7 @@ go 1.23.4
 require (
 	github.com/XciD/loxone-ws v0.0.0-20220607085522-9776fe29c2ab
 	github.com/influxdata/telegraf v1.33.0
+	github.com/sirupsen/logrus v1.9.3
 )
 
 require (
@@ -41,7 +42,6 @@ require (
 	github.com/mitchellh/mapstructure v1.5.1-0.20220423185008-bf980b35cac4 // indirect
 	github.com/naoina/go-stringutil v0.1.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/sleepinggenius2/gosmi v0.4.4 // indirect
 	github.com/stoewer/go-strcase v1.3.0 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
