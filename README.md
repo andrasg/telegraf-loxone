@@ -58,6 +58,10 @@ Tip: Use this in combination with the Influx v2 output plugin and set the `bucke
 
 If the `field` setting is missing, the field will be named `value` in the datapoint.
 
+## Troubleshooting
+
+Some more logs are emitted if the `LOGLEVEL` environmental variable is set to `INFO`, `DEBUG` or `TRACE`.
+
 ## Acknowledgements
 
 Built using XciD's [Loxone Websocket Golang](https://github.com/XciD/loxone-ws) package.
