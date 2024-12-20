@@ -13,7 +13,7 @@
             "showLog": true,
             "env": {},
             "args": [ "-config", "${workspaceFolder}/plugin.test.conf" ],
-            "output": "debug"
+            "cwd": "${workspaceFolder}"
         }
     ]
 }
