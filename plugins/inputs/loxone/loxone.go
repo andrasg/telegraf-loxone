@@ -208,6 +208,7 @@ func (w *LoxoneInput) Start(acc telegraf.Accumulator) error {
 			// check if we need to handle the event
 			item, found := w.findItemByUUID(event.UUID)
 			if !found {
+				log.Tracef("Ignoring event for UUID: %v", event.UUID)
 				continue
 			}
 
