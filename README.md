@@ -7,9 +7,9 @@ A Telegraf input plugin for collecting events from Loxone home automation system
 ## Overview
 The plugin allows metrics to be collected by telegraf from Loxone. It uses a websocket connection to Loxone. All changes to the configured UUID's are captured, no aggregation is happening.
 
-Note, only numeric type UUID values are supported.
+> Note, only numeric type UUID values are supported.
 
-Note2, only those values will be captured that have the `Use in User Interface` checkbox set in Loxone Config.
+> Note2, Loxone miniserver only emits status updates for those values that have the `Use in User Interface` checkbox set in Loxone Config. To avoid cluttering your Loxone app UI, create a dedicated user for this plugin and set permissions as needed for this user.
 
 ## Installation
 
@@ -17,11 +17,17 @@ Download the repo
 
     git clone https://github.com/andrasg/telegraf-loxone.git
 
-Build
+If you don't have Go installed, the best is to open the repo in VS Code using a devcontainer.
+
+Build using:
 
     ./build.sh
 
-Use the output executable. Make sure the file is executable (`chmod +x` as needed). You can use this input plugin using the `execd` plugin, using the following syntax:
+Copy the output executable to where you will be using it from. Make sure the file is executable (`chmod +x` as needed).
+
+### Telegraf input configuration
+
+To wire up this plugin to Telegraf, you need a config section/file for telegraf. You can use this input plugin using the `execd` input plugin in Telegraf, using the following syntax:
 
 ```
 [[inputs.execd]]
@@ -29,13 +35,25 @@ Use the output executable. Make sure the file is executable (`chmod +x` as neede
   signal = "none"
 ```
 
-Reference the config file that you will be creating in the next section.
+In this config, reference the plugin config file that you will be creating in the next section.
 
-## Configuration
+### Plugin configuration
 
-Create a configuration file, see `plugin.conf` as an example. Important, that this config file should not be put in the `telegraf.d` folder!
+Create the plugin configuration file, see `plugin.conf` as an example. Important, that this config file is different from the telegraf config file from above. The file `plugin.conf` should not be placed in the `telegraf.d` folder!
 
 Set `url`, `user` and `key` in the TOML plugin config according to your Loxone settings. 
+
+```toml
+[[inputs.loxone]]
+  ## Loxone IP address
+  url = "192.168.1.253"
+
+  ## Username for authentication to Loxone
+  user = "user"
+
+  ## password for authentication to Loxone
+  key = "pass"
+```
 
 Define items to be collected in the following format:
 ```toml
@@ -50,11 +68,11 @@ Define items to be collected in the following format:
       tagname = "tagvalue"
 ```
 
-Tip: you can get the relevant UUID's by opening your *.Loxone file using an XML editor and looking for the relevant GUID's.
+> Hint: you can get the relevant UUID's by opening your *.Loxone file using an XML editor and looking for the relevant GUID's.
 
 If the bucket setting is set, the value will be added as the `bucket` tag to the datapoints. If it is omitted, the output plugin will determine what bucket to write to.
 
-Tip: Use this in combination with the Influx v2 output plugin and set the `bucket_tag` to `bucket` and `exclude_bucket_tag` to `true` in the `[outputs.influx_v2]` section of the telegraf config.
+> Hint: Use this in combination with the Influx v2 output plugin and set the `bucket_tag` to `bucket` and `exclude_bucket_tag` to `true` in the `[outputs.influx_v2]` section of the telegraf config.
 
 If the `field` setting is missing, the field will be named `value` in the datapoint.
 
