@@ -12,6 +12,15 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+          - os: linux
+            arch: arm64
+          - os: windows
+            arch: amd64
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,12 +32,45 @@ jobs:
         with:
           go-version: '1.23.4'
 
+      - name: Set output filename
+        id: filename
+        run: |
+          if [ "${{ matrix.os }}" = "windows" ]; then
+            echo "OUTPUT_FILE=telegraf-loxone-${{ matrix.os }}-${{ matrix.arch }}.exe" >> $GITHUB_ENV
+          else
+            echo "OUTPUT_FILE=telegraf-loxone-${{ matrix.os }}-${{ matrix.arch }}" >> $GITHUB_ENV
+          fi
+
       - name: Build
-        run: go build -v -o out/telegraf-loxone cmd/main.go
+        run: GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -v -o ${{ env.OUTPUT_FILE }} cmd/main.go
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.OUTPUT_FILE }}
+          path: ${{ env.OUTPUT_FILE }}
+          retention-days: 7
+
+  publish-release:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List artifacts
+        run: find artifacts -type f
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            out/telegraf-loxone
+            artifacts/telegraf-loxone-linux-amd64/telegraf-loxone-linux-amd64
+            artifacts/telegraf-loxone-linux-arm64/telegraf-loxone-linux-arm64
+            artifacts/telegraf-loxone-windows-amd64.exe/telegraf-loxone-windows-amd64.exe
           generate_release_notes: true
