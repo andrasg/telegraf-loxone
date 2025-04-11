@@ -58,6 +58,42 @@ Tip: Use this in combination with the Influx v2 output plugin and set the `bucke
 
 If the `field` setting is missing, the field will be named `value` in the datapoint.
 
+### Alternative config format
+
+Alternatively, the config can be supplied in JSON file instead of the inline TOML format. Use the following example for crafting the external config file:
+
+```json
+{
+  "pointMappings": [
+    {
+      "bucket": "<destination_bucket>",
+      "measurements": [
+        {
+          "name": "<measurement_name>",
+          "datapoints":
+          [
+            {
+              "fields":
+              {
+                "<field_name>": "<uuid>",
+                "...": "..."
+              },
+              "tags": { 
+                "<tag1_name>": "<tag1_value>",
+                "...": "..."
+              }		
+            },
+            { ... }
+          ]
+        },
+        { ... }
+      ]
+    },
+    { ... }
+  ]
+}
+```
+
 ## Troubleshooting
 
 Some more logs are emitted if the `LOGLEVEL` environmental variable is set to `INFO`, `DEBUG` or `TRACE`.
